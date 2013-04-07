@@ -3,8 +3,11 @@ import operator as op
 import functools
 import itertools
 
-from zope.interface import implementer
-from block.chain.interfaces import IExecuteFlavor
+from zope.interface import implementer, provider
+from block.chain.interfaces import (
+    IExecuteFlavor,
+    IVirtualAccess
+    ) 
 
 ### Wrapped value
 
@@ -27,40 +30,11 @@ class _Nothing(object):
 Nothing = _Nothing()
 
 
-### Chain
+### Access registration
 
-class Chain(object):
-    def __init__(self,  fs=None):
-        self.fs = fs or []
-
-    def do(self,  *fs):
-        fs_ = self.fs[:]
-        for f in fs:
-            if hasattr(f,  "__iter__"):
-                fs_.extend(f)
-            else:
-                fs_.append(f)
-        return self.__class__(fs_)
-
-    def map(self, f, *args):
-        fs_ = self.fs[:]
-        def _map(ctx, v):
-            return ctx.map(f, v, *args)
-        fs_.append(_map)
-        return self.__class__(fs_)
-
-    def __call__(self,  ctx,  init,  *args,  **kwargs):
-        if not self.fs:
-            return init
-        cont = ctx.apply(init)
-        v = cont(self.fs[0], *args, **kwargs)
-        for f in self.fs[1:]:
-            cont = ctx.apply(v)
-            v = cont(f)
-        return v
-
-IdentityAccess = op
+IdentityAccess = provider(IVirtualAccess)(op)
  
+@implementer(IVirtualAccess)
 class BoundAccess(object):
     def __init__(self,o):
         self.o = o
@@ -76,6 +50,7 @@ class BoundAccess(object):
             return getattr(self.o, k)(v, *args, **kwargs)
         return wrapped
 
+@provider(IVirtualAccess)
 class WrappedAccess(object):
     @staticmethod
     def attrgetter(k):
@@ -96,7 +71,6 @@ class WrappedAccess(object):
         return wrapped
 
 
-### Access Registration
 class VirtualObject(object):
     def __init__(self, access=IdentityAccess):
         self.access = access
@@ -131,7 +105,40 @@ class VirtualObject(object):
         return functools.reduce(lambda v, f:f(v), self, o)
 
 
-class OnContextChainFactory(object):
+### Chain
+
+class ChainedQuery(object):
+    def __init__(self,  fs=None):
+        self.fs = fs or []
+
+    def do(self,  *fs):
+        fs_ = self.fs[:]
+        for f in fs:
+            if hasattr(f,  "__iter__"):
+                fs_.extend(f)
+            else:
+                fs_.append(f)
+        return self.__class__(fs_)
+
+    def map(self, f, *args):
+        fs_ = self.fs[:]
+        def _map(ctx, v):
+            return ctx.map(f, v, *args)
+        fs_.append(_map)
+        return self.__class__(fs_)
+
+    def __call__(self,  ctx,  init,  *args,  **kwargs):
+        if not self.fs:
+            return init
+        cont = ctx.apply(init)
+        v = cont(self.fs[0], *args, **kwargs)
+        for f in self.fs[1:]:
+            cont = ctx.apply(v)
+            v = cont(f)
+        return v
+
+
+class OnContextChainedQueryFactory(object):
     def __init__(self, vo_factory):
         self.vo_factory = vo_factory
 
@@ -150,17 +157,17 @@ class OnContextChainFactory(object):
 
     @property
     def chain(self):
-        return Chain()
+        return ChainedQuery()
 
+chain = OnContextChainedQueryFactory(functools.partial(VirtualObject, WrappedAccess))
 
 ### Executing Flavors
-
 class Context(object):
     def chain(self, init):
         return VirtualObject(BoundAccess(self))._const(init, "*init*")
 
 @implementer(IExecuteFlavor)
-class StopContext(Context):
+class MaybeF(Context):
     def failure(self, *args):
         return Nothing
 
@@ -188,7 +195,7 @@ class StopContext(Context):
         return f(v, *args)
 
 @implementer(IExecuteFlavor)
-class StopWithErrorMessageContext(StopContext):
+class ErrorF(MaybeF):
     def failure(self,  *args):
         return Failure(*args)
 
@@ -196,7 +203,7 @@ class StopWithErrorMessageContext(StopContext):
         return not bool(x)
 
 @implementer(IExecuteFlavor)
-class StateContext(Context):
+class StateF(Context):
     def unit(self, v):
         return lambda s : (s,v)
 
@@ -239,8 +246,7 @@ def put(n):
 def get(ctx, v):
     return lambda s: (s, s)
 
-# # Multiple
-class MultipleCandidatesContext(Context):
+class ListF(Context):
     def unit(self, v):
         return [v]
 

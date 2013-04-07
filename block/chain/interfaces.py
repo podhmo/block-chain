@@ -25,3 +25,12 @@ class IExecuteFlavor(Interface):
         most likely, (a -*> b) -> (m a -*> m b)
         """
 
+class IVirtualAccess(Interface):
+    def attrgetter(k):
+        """ such as, self.k"""
+
+    def itemgetter(k):
+        """ such as, self[k]"""
+
+    def methodcaller(method, *args, **kwargs):
+        """ such as, self.method(*args, **kwargs)"""
