@@ -7,24 +7,46 @@ from zope.interface import implementer, provider
 from block.chain.interfaces import (
     IQuery,
     IFalsyValue,
+    IMonoid,
+    IAnySupport,
     IExecuteFlavor,
-    IVirtualAccess
+    IVirtualAccess,
     ) 
 
 ### Wrapped value
 
-@implementer(IFalsyValue)
+@implementer(IFalsyValue, IMonoid)
 class Failure(object):
-    __slots__ = ["value"]
-    def __init__(self, value):
-        self.value = value
+    __slots__ = ["values", "delimiter", "mutable"]
+    def __init__(self, value=None, values=None, delimiter=u"", mutable=False):
+        self.values = values or [value]
+        self.delimiter = delimiter
+        self.mutable = mutable
+
+    @property
+    def empty(self):
+        return self.__class__("", delimiter=self.delimiter)
+
+    def append(self, other):
+        if self.mutable:
+            self.values.extend(other.values)
+            return self
+        else:
+            vs = self.values[:]
+            vs.extend(other.values)
+            return self.__class__(values=vs, delimiter=self.delimiter, mutable=self.mutable)
+
+    @property
+    def value(self):
+        return self.delimiter.join([unicode(v) for v in self.values])
+
     def __nonzero__(self):
         return False
     __bool__ = __nonzero__
+
     def __repr__(self):
-        return u"{0}:{1}".format(repr(self.__class__.__name__), repr(self.value))
-    def __eq__(self, x):
-        return self.value == x.value
+        return u"{0}:{1}".format(repr(self.__class__.__name__), repr(self.values))
+
 
 @implementer(IFalsyValue)
 class _Nothing(object):
@@ -162,18 +184,45 @@ class OnContextChainedQueryFactory(object):
             return ctx.lifted(f, v, *args, **kwargs)
         return wrapped
 
+    def any(self, f, g):
+        pass
+
     @property
     def chain(self):
         return ChainedQuery()
 
 chain = OnContextChainedQueryFactory(functools.partial(VirtualObject, WrappedAccess))
 
+
+### Any
+class Any(object):
+    def __init__(self, *fs):
+        self.fs = fs
+
+    def empty(self, ctx):
+        return ctx.failure(None) #xxx:
+
+    def choice(self, ctx):
+        f = self.fs[0]
+        if not ctx.is_failure(f):
+            return f
+        for g in self.fs[1:]:
+            f = ctx.choice_another(f, g)
+            if not ctx.is_failure(f):
+                return f
+        return f
+
 ### Executing Flavors
 class Context(object):
     def chain(self, init):
         return VirtualObject(BoundAccess(self))._const(init, "*init*")
 
-@implementer(IExecuteFlavor)
+    def choice(self, v):
+        if hasattr(v, "choice"):
+            return v.choice(self)
+        return v
+
+@implementer(IExecuteFlavor, IAnySupport)
 class MaybeF(Context):
     def failure(self, *args):
         return Nothing
@@ -181,7 +230,11 @@ class MaybeF(Context):
     def is_failure(self, x):
         return x == Nothing
 
+    def choice_another(self, f, g):
+        return g
+
     def apply(self, v):
+        v = self.choice(v)
         if self.is_failure(v):
             return lambda f,  *args,  **kwargs: v
         else:
@@ -196,18 +249,26 @@ class MaybeF(Context):
     def map(self, f, v, *args):
         if not args:
             return f(v)
+        args_ = []
         for e in args:
+            args_.append(self.choice(e))
             if self.is_failure(e):
                 return e
-        return f(v, *args)
+        return f(v, *args_)
 
 @implementer(IExecuteFlavor)
 class ErrorF(MaybeF):
-    def failure(self,  *args):
-        return Failure(*args)
+    def failure(self,  v):
+        return Failure(v)
+
+    def choice_another(self, f, g):
+        if self.is_failure(g):
+            return f.append(g)
+        else:
+            return g           
 
     def is_failure(self, x):
-        return not bool(x)
+        return not bool(x) and isinstance(x, Failure)
 
 @implementer(IExecuteFlavor)
 class StateF(Context):

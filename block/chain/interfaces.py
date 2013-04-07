@@ -1,14 +1,27 @@
 from zope.interface import (
     Interface,
+    Attribute
     )
 
 class IQuery(Interface):
     def value(*args, **kwargs):
         """ starting executing-query"""
 
+class IMonoid(Interface):
+    empty = Attribute("empty value")
+    def append(other):
+        """append value"""
+    
 class IFalsyValue(Interface):
     def __nonzero__():
         """it's must return False"""
+
+class IAnySupport(Interface):
+    def choice_another(f, g):
+        """choice correct value. (f is failured value)"""
+
+    def is_failure(v):
+        pass
 
 class IExecuteFlavor(Interface):
     """ this object has *the Context* of application"""

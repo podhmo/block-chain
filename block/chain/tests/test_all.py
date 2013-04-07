@@ -3,6 +3,20 @@ def string_append(prefix, x):
 
 from block.chain import chain
 
+def test_failure():
+    from block.chain import Failure
+    assert Failure("fooo").value == "fooo"
+    assert Failure("fooo").append(Failure("-bar")).value == "fooo-bar"
+    
+    f = Failure("fooo", mutable=True)
+    f.append(Failure("-bar"))
+    assert f.values == ["fooo", "-bar"]
+
+    f = Failure("fooo", mutable=False)
+    f.append(Failure("-bar"))
+    assert f.values == ["fooo"]
+
+
 def test_virtualobject():
     from block.chain import VirtualObject
     from block.chain import IdentityAccess
@@ -50,7 +64,7 @@ def test_stop_context():
     assert chain.chain.do(chain.x.x.y.z)(MaybeF(),  A) == Nothing
     assert chain.chain.do(chain["x"]["y"]).do(chain(string_append,  "!"))(MaybeF(),  {"x": {"y": "foo"}}) == "foo!"
     assert chain.chain.do(chain.wrap("a"))(ErrorF(), Wrapper("value")) == ["a", "value", "a"]
-    assert repr(chain.chain.do(chain.x.x.y.z)(ErrorF(),  A)) == u"""'Failure':AttributeError("class x has no attribute 'x'",)"""
+    assert repr(chain.chain.do(chain.x.x.y.z)(ErrorF(),  A)) == u"""'Failure':[AttributeError("class x has no attribute 'x'",)]"""
 
 def test_state_context():
     from block.chain import StateF
@@ -104,12 +118,12 @@ def test_map():
     assert chain.chain.map(lambda x,y,z : [x,y,z] ,12, 13)(MaybeF(), 11) == [11,12,13]
     assert chain.chain.map(lambda x,y,z : [x,y,z] ,Nothing, 12)(MaybeF(), 11) == Nothing
 
-    assert repr(chain.chain.map(lambda x : x+1)(ErrorF(), Failure(10))) == "'Failure':10"
+    assert repr(chain.chain.map(lambda x : x+1)(ErrorF(), Failure(10))) == "'Failure':[10]"
     assert chain.chain.map(lambda x : x+1)(ErrorF(), 10) == 11
     assert chain.chain.map(lambda x,y : x+y ,12)(ErrorF(), 10) == 22
-    assert repr(chain.chain.map(lambda x,y : x+y ,Failure(11))(ErrorF(), 10)) == "'Failure':11"
+    assert repr(chain.chain.map(lambda x,y : x+y ,Failure(11))(ErrorF(), 10)) == "'Failure':[11]"
     assert chain.chain.map(lambda x,y,z : [x,y,z] ,12, 13)(ErrorF(), 11) == [11,12,13]
-    assert repr(chain.chain.map(lambda x,y,z : [x,y,z] ,Failure(11), 12)(ErrorF(), 11)) ==  "'Failure':11"
+    assert repr(chain.chain.map(lambda x,y,z : [x,y,z] ,Failure(11), 12)(ErrorF(), 11)) ==  "'Failure':[11]"
     ctx = StateF()
     assert chain.chain.map(lambda x : x+1)(ctx, ctx.unit(10))(0) == (0,11)
     assert chain.chain.map(lambda x,y : x+y ,ctx.unit(12))(ctx, ctx.unit(10))(0) == (0, 22)
@@ -122,3 +136,19 @@ def test_map():
     assert chain.chain.map(lambda x,y : x+y, [7,8,9])(ctx, [10,20,30]) == [17, 18, 19, 27, 28, 29, 37, 38, 39]
     assert chain.chain.map(lambda x,y,z : [x,y,z], [7,8,9], ["a", "b"])(ctx, [10,20,30]) == [[10, 7, 'a'], [10, 7, 'b'], [10, 8, 'a'], [10, 8, 'b'], [10, 9, 'a'], [10, 9, 'b'], [20, 7, 'a'], [20, 7, 'b'], [20, 8, 'a'], [20, 8, 'b'], [20, 9, 'a'], [20, 9, 'b'], [30, 7, 'a'], [30, 7, 'b'], [30, 8, 'a'], [30, 8, 'b'], [30, 9, 'a'], [30, 9, 'b']]
 
+
+def test_any():
+    from block.chain import (
+        MaybeF,
+        Nothing,
+        Any,
+
+        ErrorF,
+        Failure
+        )
+    assert chain.chain.map(lambda x : x+1)(MaybeF(),Nothing) == Nothing
+    assert chain.chain.map(lambda x, y: x+y, Any(Nothing, 20))(MaybeF(), 10) == 30
+    assert chain.chain.map(lambda x, y: x+y, Any(Nothing, 20))(MaybeF(), Any(Nothing, 10)) == 30
+    assert chain.chain.map(lambda x, y: x+y, Any(Nothing, 20))(MaybeF(), Any(20, Nothing, 10)) == 40
+
+    assert Any(Failure("foo"), Failure("bar")).choice(ErrorF()).value == "foobar"
