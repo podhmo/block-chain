@@ -16,6 +16,15 @@ def test_failure():
     f.append(Failure("-bar"))
     assert f.values == ["fooo"]
 
+def test_choice_from():
+    from block.chain import MaybeF, Nothing
+    assert reduce(MaybeF().choice_from, [Nothing, Nothing, Nothing]) == Nothing
+    assert reduce(MaybeF().choice_from, [Nothing, 10, Nothing]) == 10
+
+    from block.chain import ErrorF, Failure
+    assert reduce(ErrorF().choice_from, [Failure("x"), Failure("y"), Failure("z")]).value == "xyz"
+    assert reduce(ErrorF().choice_from, [Failure("x"), 10, Failure("z")]) == 10
+
 
 def test_virtualobject():
     from block.chain import VirtualObject
@@ -155,4 +164,3 @@ def test_any():
     assert Any(Failure("foo"), 20).choice(ErrorF()) == 20
     assert chain.chain.map(lambda x, y: x+y, Failure("y not found."))(ErrorF(), Failure("x not found.")).value == "x not found."
     assert chain.chain.map(lambda _, x, y: x+y, Failure("x not found."), Failure("y not found."))(ErrorF(), 10).value == "x not found.y not found."
-

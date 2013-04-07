@@ -222,6 +222,11 @@ class Context(object):
             return v.choice(self)
         return v
 
+    def choice_from(self, f, g):
+        if self.is_failure(f):
+            return self.choice_another(f, g)
+        return f
+
 @implementer(IExecuteFlavor, IAnySupport)
 class MaybeF(Context):
     def failure(self, *args):
@@ -256,7 +261,7 @@ class MaybeF(Context):
                 return e
         return f(v, *args_)
 
-@implementer(IExecuteFlavor)
+@implementer(IExecuteFlavor, IAnySupport)
 class ErrorF(MaybeF):
     def failure(self,  v):
         return Failure(v)
@@ -264,8 +269,7 @@ class ErrorF(MaybeF):
     def choice_another(self, f, g):
         if self.is_failure(g):
             return f.append(g)
-        else:
-            return g           
+        return g           
 
     def is_failure(self, x):
         return not bool(x) and isinstance(x, Failure)
