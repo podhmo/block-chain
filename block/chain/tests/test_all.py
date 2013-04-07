@@ -35,7 +35,7 @@ def test_virtualobject():
     assert ctx.vobject(ctx.unit(12)).put(20).value() == [('unit', 12), ('put', 'unit', 20)]
 
 def test_stop_context():
-    from block.chain import StopContext, NIL
+    from block.chain import StopContext, Nothing
     from block.chain import StopWithErrorMessageContext
 
     class A:
@@ -51,7 +51,7 @@ def test_stop_context():
 
     assert cc.chain.do(cc.x.y.z)(StopContext(),  A) == 10
     assert cc.chain.do(cc["x"]["y"]["z"])(StopContext(),  {"x": {"y": {"z": 10}}}) == 10
-    assert cc.chain.do(cc.x.x.y.z)(StopContext(),  A) == NIL
+    assert cc.chain.do(cc.x.x.y.z)(StopContext(),  A) == Nothing
     assert cc.chain.do(cc["x"]["y"]).do(cc(string_append,  "!"))(StopContext(),  {"x": {"y": "foo"}}) == "foo!"
     assert cc.chain.do(cc.wrap("a"))(StopWithErrorMessageContext(), Wrapper("value")) == ["a", "value", "a"]
     assert repr(cc.chain.do(cc.x.x.y.z)(StopWithErrorMessageContext(),  A)) == u"""'Failure':AttributeError("class x has no attribute 'x'",)"""
@@ -98,15 +98,15 @@ def test_map():
         StopWithErrorMessageContext,
         StopContext,
         StateContext,
-        NIL,
+        Nothing,
         Failure
         )
-    assert cc.chain.map(lambda x : x+1)(StopContext(),NIL) == NIL
+    assert cc.chain.map(lambda x : x+1)(StopContext(),Nothing) == Nothing
     assert cc.chain.map(lambda x : x+1)(StopContext(), 10) == 11
     assert cc.chain.map(lambda x,y : x+y ,12)(StopContext(), 10) == 22
-    assert cc.chain.map(lambda x,y : x+y ,NIL)(StopContext(), 10) == NIL
+    assert cc.chain.map(lambda x,y : x+y ,Nothing)(StopContext(), 10) == Nothing
     assert cc.chain.map(lambda x,y,z : [x,y,z] ,12, 13)(StopContext(), 11) == [11,12,13]
-    assert cc.chain.map(lambda x,y,z : [x,y,z] ,NIL, 12)(StopContext(), 11) == NIL
+    assert cc.chain.map(lambda x,y,z : [x,y,z] ,Nothing, 12)(StopContext(), 11) == Nothing
 
     assert repr(cc.chain.map(lambda x : x+1)(StopWithErrorMessageContext(), Failure(10))) == "'Failure':10"
     assert cc.chain.map(lambda x : x+1)(StopWithErrorMessageContext(), 10) == 11

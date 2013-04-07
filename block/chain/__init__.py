@@ -20,11 +20,11 @@ class Failure(object):
     def __eq__(self, x):
         return self.value == x.value
 
-class _Nil(object):
+class _Nothing(object):
     def __nonzero__(self):
         return False
     __bool__ = __nonzero__
-NIL = _Nil()
+Nothing = _Nothing()
 
 
 ### Chain
@@ -162,10 +162,10 @@ class Context(object):
 @implementer(IExecuteFlavor)
 class StopContext(Context):
     def failure(self, *args):
-        return NIL
+        return Nothing
 
     def is_failure(self, x):
-        return x == NIL
+        return x == Nothing
 
     def apply(self, v):
         if self.is_failure(v):
