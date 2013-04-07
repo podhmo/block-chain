@@ -270,6 +270,21 @@ class ErrorF(MaybeF):
     def is_failure(self, x):
         return not bool(x) and isinstance(x, Failure)
 
+    def map(self, f, v, *args):
+        if not args:
+            return f(v)
+        args_ = []
+
+        failures = []
+        for e in args:
+            e = self.choice(e)
+            args_.append(e)
+            if self.is_failure(e):
+                failures.append(e)
+        if failures:
+            return functools.reduce(self.choice_another, failures)
+        return f(v, *args_)
+
 @implementer(IExecuteFlavor)
 class StateF(Context):
     def unit(self, v):

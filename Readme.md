@@ -33,11 +33,32 @@ chain.chain.do(inc).map(lambda x,y: [x,y], Nothing).value(MaybeF(), 10) # => Not
 chain.chain.do(inc).map(lambda x,y: [x,y], 20).value(MaybeF(), Nothing) # => Nothing
 ```
 
+### Error like
+
+Error is like a Maybe, but this feature has also error reasons.
+```
+from block.chain import MaybeF, chain
+
+def inc(ctx, x):
+    return x + 1
+
+## falsy value is Failure(<messages>)
+
+Failure("fooo").append(Failure("-bar")).value # => "fooo-bar"
+
+## like a maybe
+chain.chain.do(inc).map(lambda x : x*10).value(ErrorF(), 10) # => 110
+chain.chain.do(inc).map(lambda x,y: [x,y], Failure("this-is-invalid")).value(ErrorF(), 10) # => Failure("<this is invalid>")
+chain.chain.map(lambda x,y: [x,y], Any(Failure("this-is-invalid"), 20)).value(ErrorF(), 10) # => [10,20]
+chain.chain.map(lambda x,y,z: [x,y,z], Failure("y"), Failure(" z")).value(ErrorF(), 10) # => Failure("y z")
+chain.chain.map(lambda x,y,z: [x,y,z], Failure("y"), Failure(" z")).value(ErrorF(), Failure("x")) # => Failure("x")
+```
+
 ### List like
 
 List is amb computation.
 ```
-from block.chain import ListF, chain
+from block.chain import ListF, chain, Any
 
 def tri(ctx, x):
     return [x, x+1, x]

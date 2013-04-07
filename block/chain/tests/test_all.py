@@ -152,3 +152,7 @@ def test_any():
     assert chain.chain.map(lambda x, y: x+y, Any(Nothing, 20))(MaybeF(), Any(20, Nothing, 10)) == 40
 
     assert Any(Failure("foo"), Failure("bar")).choice(ErrorF()).value == "foobar"
+    assert Any(Failure("foo"), 20).choice(ErrorF()) == 20
+    assert chain.chain.map(lambda x, y: x+y, Failure("y not found."))(ErrorF(), Failure("x not found.")).value == "x not found."
+    assert chain.chain.map(lambda _, x, y: x+y, Failure("x not found."), Failure("y not found."))(ErrorF(), 10).value == "x not found.y not found."
+
