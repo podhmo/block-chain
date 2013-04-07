@@ -5,12 +5,15 @@ import itertools
 
 from zope.interface import implementer, provider
 from block.chain.interfaces import (
+    IQuery,
+    IFalsyValue,
     IExecuteFlavor,
     IVirtualAccess
     ) 
 
 ### Wrapped value
 
+@implementer(IFalsyValue)
 class Failure(object):
     __slots__ = ["value"]
     def __init__(self, value):
@@ -23,11 +26,13 @@ class Failure(object):
     def __eq__(self, x):
         return self.value == x.value
 
+@implementer(IFalsyValue)
 class _Nothing(object):
     def __nonzero__(self):
         return False
     __bool__ = __nonzero__
 Nothing = _Nothing()
+
 
 
 ### Access registration
@@ -71,6 +76,7 @@ class WrappedAccess(object):
         return wrapped
 
 
+@implementer(IQuery)
 class VirtualObject(object):
     def __init__(self, access=IdentityAccess):
         self.access = access
@@ -106,7 +112,7 @@ class VirtualObject(object):
 
 
 ### Chain
-
+@implementer(IQuery)
 class ChainedQuery(object):
     def __init__(self,  fs=None):
         self.fs = fs or []
@@ -127,7 +133,7 @@ class ChainedQuery(object):
         fs_.append(_map)
         return self.__class__(fs_)
 
-    def __call__(self,  ctx,  init,  *args,  **kwargs):
+    def value(self,  ctx,  init,  *args,  **kwargs):
         if not self.fs:
             return init
         cont = ctx.apply(init)
@@ -136,6 +142,7 @@ class ChainedQuery(object):
             cont = ctx.apply(v)
             v = cont(f)
         return v
+    __call__ = value
 
 
 class OnContextChainedQueryFactory(object):

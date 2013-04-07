@@ -2,6 +2,14 @@ from zope.interface import (
     Interface,
     )
 
+class IQuery(Interface):
+    def value(*args, **kwargs):
+        """ starting executing-query"""
+
+class IFalsyValue(Interface):
+    def __nonzero__():
+        """it's must return False"""
+
 class IExecuteFlavor(Interface):
     """ this object has *the Context* of application"""
     def chain(initvalue):
