@@ -10,7 +10,7 @@ python library about computation with a parametric context.
 
 Maybe is a computation that might have failed. if computation is failed then return Nothing.
 ```
-from block.chain import MaybeF, chain
+from block.chain import MaybeF, chain, Nothing
 
 def inc(ctx, x):
     return x + 1
@@ -37,7 +37,7 @@ chain.chain.do(inc).map(lambda x,y: [x,y], 20).value(MaybeF(), Nothing) # => Not
 
 Error is like a Maybe, but this feature has also error reasons.
 ```
-from block.chain import MaybeF, chain
+from block.chain import ErrorF, chain, Failure
 
 def inc(ctx, x):
     return x + 1

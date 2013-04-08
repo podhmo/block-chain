@@ -24,6 +24,7 @@ def test_choice_from():
     from block.chain import ErrorF, Failure
     assert reduce(ErrorF().choice_from, [Failure("x"), Failure("y"), Failure("z")]).value == "xyz"
     assert reduce(ErrorF().choice_from, [Failure("x"), 10, Failure("z")]) == 10
+    assert reduce(ErrorF().choice_from, [Failure("x"), 10, Failure("z"), 20]) == 10
 
 
 def test_virtualobject():
