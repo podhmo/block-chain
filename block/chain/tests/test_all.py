@@ -4,54 +4,58 @@ def string_append(prefix, x):
 from block.chain import chain
 
 def test_failure():
-    from block.chain import Failure
+    from block.chain.monoid.immutable import Failure
     assert Failure("fooo").value == "fooo"
     assert Failure("fooo").append(Failure("-bar")).value == "fooo-bar"
     
-    f = Failure("fooo", mutable=True)
+    from block.chain.monoid.mutable import Failure as MFailure
+    f = MFailure("fooo")
     f.append(Failure("-bar"))
     assert f.values == ["fooo", "-bar"]
 
-    f = Failure("fooo", mutable=False)
+    f = Failure("fooo")
     f.append(Failure("-bar"))
     assert f.values == ["fooo"]
 
 def test_listmonoid():
-    from block.chain import ListMonoid
+    from block.chain.monoid.immutable import ListMonoid
     assert ListMonoid([1,2,3]).value == [1,2,3]
     assert ListMonoid([1,2,3]).append(ListMonoid([4,5,6])).value == [1,2,3,4,5,6]
 
-    m = ListMonoid([1,2,3], mutable=True)
+    from block.chain.monoid.mutable import ListMonoid as MListMonoid
+    m = MListMonoid([1,2,3])
     m.append(ListMonoid([4]))
     assert m.value == [1,2,3,4]
 
-    m = ListMonoid([1,2,3], mutable=False)
+    m = ListMonoid([1,2,3])
     m.append(ListMonoid([4]))
     assert m.value == [1,2,3]
 
 def test_stringmonoid():
-    from block.chain import StringMonoid
+    from block.chain.monoid.immutable import StringMonoid
     assert StringMonoid("foo").value == "foo"
     assert StringMonoid("foo").append(StringMonoid("bar")).value == "foobar"
 
-    m = StringMonoid("foo", mutable=True)
+    from block.chain.monoid.mutable import StringMonoid as MStringMonoid
+    m = MStringMonoid("foo")
     m.append(StringMonoid("bar"))
     assert m.value == "foobar"
 
-    m = StringMonoid("foo", mutable=False)
+    m = StringMonoid("foo")
     m.append(StringMonoid("bar"))
     assert m.value == "foo"
     
 def test_summonoid():
-    from block.chain import SumMonoid
+    from block.chain.monoid.immutable import SumMonoid
     assert SumMonoid(3).value == 3
     assert SumMonoid(3).append(SumMonoid(4)).value == 7
 
-    m = SumMonoid(3, mutable=True)
+    from block.chain.monoid.mutable import SumMonoid as MSumMonoid
+    m = MSumMonoid(3)
     m.append(SumMonoid(4))
     assert m.value == 7
 
-    m = SumMonoid(3, mutable=False)
+    m = SumMonoid(3)
     m.append(SumMonoid(4))
     assert m.value == 3
 
@@ -152,7 +156,7 @@ def test_multiple_context():
 
 def test_writer_context():
     from block.chain import WriterF
-    from block.chain import ListMonoid, StringMonoid
+    from block.chain.monoid.mutable import ListMonoid, StringMonoid
     
     M = WriterF(ListMonoid)
     def inc(ctx, v):

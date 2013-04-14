@@ -7,124 +7,21 @@ from zope.interface import implementer, provider
 from block.chain.interfaces import (
     IQuery,
     IFalsyValue,
-    IMonoid,
     IAnySupport,
     IExecuteFlavor,
     IVirtualAccess,
     ) 
+from block.chain.monoid.mutable import Failure as MFailure
+from block.chain.monoid.immutable import Failure as IMFailure
+Failure = MFailure
 
 ### Wrapped value
-
-@implementer(IFalsyValue, IMonoid)
-class Failure(object):
-    __slots__ = ["values", "delimiter", "mutable"]
-    def __init__(self, value=None, values=None, delimiter=u"", mutable=False):
-        self.values = values or [value]
-        self.delimiter = delimiter
-        self.mutable = mutable
-
-    @property
-    def empty(self):
-        return self.__class__("", delimiter=self.delimiter)
-
-    def append(self, other):
-        if self.mutable:
-            self.values.extend(other.values)
-            return self
-        else:
-            vs = self.values[:]
-            vs.extend(other.values)
-            return self.__class__(values=vs, delimiter=self.delimiter, mutable=self.mutable)
-
-    @property
-    def value(self):
-        return self.delimiter.join([unicode(v) for v in self.values])
-
-    def __nonzero__(self):
-        return False
-    __bool__ = __nonzero__
-
-    def __repr__(self):
-        return u"{0}:{1}".format(repr(self.__class__.__name__), repr(self.values))
-
-
 @implementer(IFalsyValue)
 class _Nothing(object):
     def __nonzero__(self):
         return False
     __bool__ = __nonzero__
 Nothing = _Nothing()
-
-
-class MonoidBase(object):
-    default = None
-    def __init__(self, value=None, mutable=False):
-        self._value = value or self.default
-        self.mutable = mutable
-
-    @classmethod
-    def empty(cls, mutable=False):
-        return cls(mutable)
-
-    def __eq__(self, other):
-        return (self.__class__ == other.__class__ and
-                self.value == other.value)
-
-    @property
-    def value(self):
-        return self._value
-
-@implementer(IMonoid)
-class SumMonoid(MonoidBase):
-    default = 0
-    def append(self, other):
-        if self.mutable:
-            self._value += other._value
-            return self
-        else:
-            value = self._value + other._value
-            return self.__class__(value=value, mutable=False)
-            
-@implementer(IMonoid)
-class ProductMonoid(MonoidBase):
-    default = 1
-    def append(self, other):
-        if self.mutable:
-            self._value *= other._value
-            return self
-        else:
-            value = self._value * other._value
-            return self.__class__(value=value, mutable=False)
-            
-
-@implementer(IMonoid)
-class ListMonoid(MonoidBase):
-    def __init__(self, value=None, mutable=False):
-        self._value = value or []
-        self.mutable = mutable
-
-    def append(self, other):
-        if self.mutable:
-            self._value.extend(other._value)
-            return self
-        else:
-            value = self._value[:]
-            value.extend(other._value)
-            return self.__class__(value=value, mutable=False)
-
-@implementer(IMonoid)
-class StringMonoid(ListMonoid):
-    def __init__(self, value=None, mutable=False):
-        if isinstance(value,(str,unicode)):
-            self._value = [value]
-        else:
-            self._value = value or []
-        self.mutable = mutable
-
-    @property
-    def value(self):
-        return u"".join(self._value)
-
 ### Access registration
 
 IdentityAccess = provider(IVirtualAccess)(op)
@@ -340,8 +237,14 @@ class MaybeF(Context):
 
 @implementer(IExecuteFlavor, IAnySupport)
 class ErrorF(MaybeF):
+    def __init__(self, mutable=True):
+        if mutable:
+            self.Failure = MFailure
+        else:
+            self.Failure = IMFailure
+
     def failure(self,  v):
-        return Failure(v)
+        return self.Failure(v)
 
     def choice_another(self, f, g):
         if self.is_failure(g):
@@ -349,7 +252,7 @@ class ErrorF(MaybeF):
         return g           
 
     def is_failure(self, x):
-        return not bool(x) and isinstance(x, Failure)
+        return not bool(x) and isinstance(x, (IMFailure, MFailure)) #xxx:
 
     def map(self, f, v, *args):
         v = self.choice(v)
