@@ -12,8 +12,8 @@ class Failure(FailureBase):
 
 @implementer(IMonoid)
 class SumMonoid(MonoidBase):
-    __slots__ = ["_value"]
     default = 0
+    __slots__ = ["_value"]
     def append(self, other):
         self._value += other._value
         return self
@@ -21,12 +21,14 @@ class SumMonoid(MonoidBase):
 @implementer(IMonoid)
 class ProductMonoid(MonoidBase):
     default = 1
+    __slots__ = ["_value"]
     def append(self, other):
         self._value *= other._value
         return self
 
 @implementer(IMonoid)
 class ListMonoid(MonoidBase):
+    __slots__ = ["_value"]
     def __init__(self, value=None):
         self._value = value or []
 
@@ -36,6 +38,7 @@ class ListMonoid(MonoidBase):
 
 @implementer(IMonoid)
 class StringMonoid(ListMonoid):
+    __slots__ = ["_value"]
     def __init__(self, value=None):
         if isinstance(value,(str,unicode)):
             self._value = [value]
