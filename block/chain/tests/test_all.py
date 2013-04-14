@@ -16,6 +16,45 @@ def test_failure():
     f.append(Failure("-bar"))
     assert f.values == ["fooo"]
 
+def test_listmonoid():
+    from block.chain import ListMonoid
+    assert ListMonoid([1,2,3]).value == [1,2,3]
+    assert ListMonoid([1,2,3]).append(ListMonoid([4,5,6])).value == [1,2,3,4,5,6]
+
+    m = ListMonoid([1,2,3], mutable=True)
+    m.append(ListMonoid([4]))
+    assert m.value == [1,2,3,4]
+
+    m = ListMonoid([1,2,3], mutable=False)
+    m.append(ListMonoid([4]))
+    assert m.value == [1,2,3]
+
+def test_stringmonoid():
+    from block.chain import StringMonoid
+    assert StringMonoid("foo").value == "foo"
+    assert StringMonoid("foo").append(StringMonoid("bar")).value == "foobar"
+
+    m = StringMonoid("foo", mutable=True)
+    m.append(StringMonoid("bar"))
+    assert m.value == "foobar"
+
+    m = StringMonoid("foo", mutable=False)
+    m.append(StringMonoid("bar"))
+    assert m.value == "foo"
+    
+def test_summonoid():
+    from block.chain import SumMonoid
+    assert SumMonoid(3).value == 3
+    assert SumMonoid(3).append(SumMonoid(4)).value == 7
+
+    m = SumMonoid(3, mutable=True)
+    m.append(SumMonoid(4))
+    assert m.value == 7
+
+    m = SumMonoid(3, mutable=False)
+    m.append(SumMonoid(4))
+    assert m.value == 3
+
 def test_choice_from():
     from block.chain import MaybeF, Nothing
     assert reduce(MaybeF().choice_from, [Nothing, Nothing, Nothing]) == Nothing
@@ -111,6 +150,27 @@ def test_multiple_context():
     assert chain.chain.do(tri).do(chain(lambda x: x*2))(M, M.unit(10)) == [20,22,20]
     assert chain.chain.do(tri).do(chain.__add__(10))(M, M.unit(10)) == [20,21,20]
 
+def test_writer_context():
+    from block.chain import WriterF
+    from block.chain import ListMonoid, StringMonoid
+    
+    M = WriterF(ListMonoid)
+    def inc(ctx, v):
+        return ctx.unit(v+1)
+
+    assert chain.chain.value(M, M.unit("heh")) == (ListMonoid(), "heh")
+    assert chain.chain.do(inc).do(inc).value(M, M.unit(10)) == (ListMonoid(), 12)
+    assert chain.chain.map(lambda x : x*x).value(M, M.unit(10)) == (ListMonoid(), 100)
+    assert chain.chain.do(M.tell(["hey."])).do(inc).do(M.tell(["this is message"])).value(M, M.unit(10)) == (ListMonoid(value=["hey.", "this is message"]), 11)
+
+    M2 = WriterF(StringMonoid)
+    assert chain.chain.do(M.tell("hey ")).do(M.listen).do(lambda ctx, (m, x): ctx.unit(m.value+x)).value(M2, M2.unit("foo")) == (StringMonoid("hey"), "hey foo")
+
+    # def passing2(ctx, v):
+    #     ms = ctx.tell()
+    #     ms = ms + ms
+    #     return ctx.monoid(ms, v)
+    # assert chain.chain.do(M2.passing("hey")).do(passing2).value(M2, M2.unit(10)) == (StringMonoid("heyhey"), 10)
 
 def test_map():
     from block.chain import (

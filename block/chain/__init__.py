@@ -56,6 +56,74 @@ class _Nothing(object):
 Nothing = _Nothing()
 
 
+class MonoidBase(object):
+    default = None
+    def __init__(self, value=None, mutable=False):
+        self._value = value or self.default
+        self.mutable = mutable
+
+    @classmethod
+    def empty(cls, mutable=False):
+        return cls(mutable)
+
+    def __eq__(self, other):
+        return (self.__class__ == other.__class__ and
+                self.value == other.value)
+
+    @property
+    def value(self):
+        return self._value
+
+@implementer(IMonoid)
+class SumMonoid(MonoidBase):
+    default = 0
+    def append(self, other):
+        if self.mutable:
+            self._value += other._value
+            return self
+        else:
+            value = self._value + other._value
+            return self.__class__(value=value, mutable=False)
+            
+@implementer(IMonoid)
+class ProductMonoid(MonoidBase):
+    default = 1
+    def append(self, other):
+        if self.mutable:
+            self._value *= other._value
+            return self
+        else:
+            value = self._value * other._value
+            return self.__class__(value=value, mutable=False)
+            
+
+@implementer(IMonoid)
+class ListMonoid(MonoidBase):
+    def __init__(self, value=None, mutable=False):
+        self._value = value or []
+        self.mutable = mutable
+
+    def append(self, other):
+        if self.mutable:
+            self._value.extend(other._value)
+            return self
+        else:
+            value = self._value[:]
+            value.extend(other._value)
+            return self.__class__(value=value, mutable=False)
+
+@implementer(IMonoid)
+class StringMonoid(ListMonoid):
+    def __init__(self, value=None, mutable=False):
+        if isinstance(value,(str,unicode)):
+            self._value = [value]
+        else:
+            self._value = value or []
+        self.mutable = mutable
+
+    @property
+    def value(self):
+        return u"".join(self._value)
 
 ### Access registration
 
@@ -352,6 +420,36 @@ class ListF(Context):
         if not args:
             return self.unit(f(v))
         return [f(v, *vs) for vs in itertools.product(*args)]
+
+class WriterF(Context):
+    def __init__(self, monoid_class):
+        self.monoid = monoid_class
+
+    def unit(self, v):
+        return (self.monoid.empty(), v)
+
+    def apply(self, (m0,v0)):
+        def wrapped(f, *args, **kwargs):
+            m1, v = f(self, v0, *args, **kwargs)
+            return (m0.append(m1),v)
+        return wrapped
+        
+    def lifted(self, f, v, *args, **kwargs):
+        return self.unit(f(v, *args, **kwargs))
+
+    def map(self, f, v, *args, **kwargs):
+        return self.unit(f(v, *args, **kwargs))
+
+    ## utility
+    def tell(self, w):
+        return lambda ctx, v: (ctx.monoid(value=w), v)
+
+    def listen(self, ctx, (m, v)):
+        return (m, (v, m))
+    
+    def passing(self, monoid_update):
+        return lambda ctx, v: ()
+        
 
 # ## todo: guard function
 # ## todo: interface change
