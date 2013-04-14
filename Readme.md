@@ -37,7 +37,7 @@ chain.chain.do(inc).map(lambda x,y: [x,y], 20).value(MaybeF(), Nothing) # => Not
 
 Error is like a Maybe, but this feature has also error reasons.
 ```
-from block.chain import ErrorF, chain, Failure
+from block.chain import ErrorF, chain, Failure, Any
 
 def inc(ctx, x):
     return x + 1
@@ -51,14 +51,14 @@ chain.chain.do(inc).map(lambda x : x*10).value(ErrorF(), 10) # => 110
 chain.chain.do(inc).map(lambda x,y: [x,y], Failure("this-is-invalid")).value(ErrorF(), 10) # => Failure("<this is invalid>")
 chain.chain.map(lambda x,y: [x,y], Any(Failure("this-is-invalid"), 20)).value(ErrorF(), 10) # => [10,20]
 chain.chain.map(lambda x,y,z: [x,y,z], Failure("y"), Failure(" z")).value(ErrorF(), 10) # => Failure("y z")
-chain.chain.map(lambda x,y,z: [x,y,z], Failure("y"), Failure(" z")).value(ErrorF(), Failure("x")) # => Failure("x")
+chain.chain.map(lambda x,y,z: [x,y,z], Failure("y"), Failure(" z")).value(ErrorF(), Failure("x")) # => Failure("xy z")
 ```
 
 ### List like
 
 List is amb computation.
 ```
-from block.chain import ListF, chain, Any
+from block.chain import ListF, chain
 
 def tri(ctx, x):
     return [x, x+1, x]
