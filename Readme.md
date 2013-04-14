@@ -64,9 +64,9 @@ def tri(ctx, x):
     return [x, x+1, x]
 
 ctx = ListF()
-chain.chain.do(tri).do(tri)(ctx, ctx.unit(10)) # => [10, 11, 10, 11, 12, 11, 10, 11, 10]
-chain.chain.map(lambda x,y : x+y, [7,8,9])(ctx, [10,20,30]) # => [17, 18, 19, 27, 28, 29, 37, 38, 39]
-chain.chain.map(lambda x,y,z : [x,y,z], [7,8,9], ["a", "b"])(ctx, [10,20,30]) # => [[10, 7, 'a'], [10, 7, 'b'], [10, 8, 'a'], [10, 8, 'b'], [10, 9, 'a'], [10, 9, 'b'], [20, 7, 'a'], [20, 7, 'b'], [20, 8, 'a'], [20, 8, 'b'], [20, 9, 'a'], [20, 9, 'b'], [30, 7, 'a'], [30, 7, 'b'], [30, 8, 'a'], [30, 8, 'b'], [30, 9, 'a'], [30, 9, 'b']]
+chain.chain.do(tri).do(tri).value(ctx, ctx.unit(10)) # => [10, 11, 10, 11, 12, 11, 10, 11, 10]
+chain.chain.map(lambda x,y : x+y, [7,8,9]).value(ctx, [10,20,30]) # => [17, 18, 19, 27, 28, 29, 37, 38, 39]
+chain.chain.map(lambda x,y,z : [x,y,z], [7,8,9], ["a", "b"]).value(ctx, [10,20,30]) # => [[10, 7, 'a'], [10, 7, 'b'], [10, 8, 'a'], [10, 8, 'b'], [10, 9, 'a'], [10, 9, 'b'], [20, 7, 'a'], [20, 7, 'b'], [20, 8, 'a'], [20, 8, 'b'], [20, 9, 'a'], [20, 9, 'b'], [30, 7, 'a'], [30, 7, 'b'], [30, 8, 'a'], [30, 8, 'b'], [30, 9, 'a'], [30, 9, 'b']]
 ```
 
 ### State like
@@ -85,9 +85,9 @@ def put(n):
     return wrapped
 
 ctx = StateF()
-chain.chain(ctx, ctx.unit(10))(0) # => (0, 10)
-chain.chain.do(inc).do(inc)(ctx, ctx.unit(10))(0) # => (2, 10)
-chain.chain.do(inc).do(inc).do(put(100)).do(inc).do(inc)(ctx, ctx.unit(10))(0) # => (102, 10)
-chain.chain.do(inc).map(lambda x : x + 10)(ctx, ctx.unit(10))(0) # => (1, 20)
+chain.chain.value(ctx, ctx.unit(10))(0) # => (0, 10)
+chain.chain.do(inc).do(inc).value(ctx, ctx.unit(10))(0) # => (2, 10)
+chain.chain.do(inc).do(inc).do(put(100)).do(inc).do(inc).value(ctx, ctx.unit(10))(0) # => (102, 10)
+chain.chain.do(inc).map(lambda x : x + 10).value(ctx, ctx.unit(10))(0) # => (1, 20)
 ```
 

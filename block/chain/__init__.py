@@ -210,10 +210,16 @@ class ChainedQuery(object):
     def do(self,  *fs):
         fs_ = self.fs[:]
         for f in fs:
-            if hasattr(f,  "__iter__"):
-                fs_.extend(f)
+            if hasattr(f, "__iter__"):
+                def _do(ctx, v, *args, **kwargs):
+                    for subf in f:
+                        v = ctx.bind(v, subf, *args, **kwargs)
+                    return v
+                fs_.append(_do)
             else:
-                fs_.append(f)
+                def _do(ctx, v, *args, **kwargs):
+                    return ctx.bind(v, f, *args, **kwargs)
+                fs_.append(_do)
         return self.__class__(fs_)
 
     def map(self, f, *args):
@@ -226,14 +232,15 @@ class ChainedQuery(object):
     def value(self,  ctx,  init,  *args,  **kwargs):
         if not self.fs:
             return init
-        cont = ctx.apply(init)
-        v = cont(self.fs[0], *args, **kwargs)
+        v = self.fs[0](ctx, init, *args, **kwargs)
         for f in self.fs[1:]:
-            cont = ctx.apply(v)
-            v = cont(f)
+            v = f(ctx, v)
         return v
-    __call__ = value
 
+    def direct(self, f):
+        fs_ = self.fs[:]
+        fs_.append(f)
+        return self.__class__(fs_)
 
 class OnContextChainedQueryFactory(object):
     def __init__(self, vo_factory):
@@ -251,9 +258,6 @@ class OnContextChainedQueryFactory(object):
         def wrapped(ctx,v):
             return ctx.lifted(f, v, *args, **kwargs)
         return wrapped
-
-    def any(self, f, g):
-        pass
 
     @property
     def chain(self):
@@ -306,12 +310,12 @@ class MaybeF(Context):
     def choice_another(self, f, g):
         return g
 
-    def apply(self, v):
+    def bind(self, v, f, *args, **kwargs):
         v = self.choice(v)
         if self.is_failure(v):
-            return lambda f,  *args,  **kwargs: v
+            return v
         else:
-            return lambda f,  *args,  **kwargs: f(self, v,  *args, **kwargs)
+            return f(self, v, *args, **kwargs)
 
     def lifted(self, f, v, *args, **kwargs):
         try:
@@ -320,8 +324,13 @@ class MaybeF(Context):
             return self.failure(e)
 
     def map(self, f, v, *args):
+        v = self.choice(v)
+
+        if self.is_failure(v):
+            return v
         if not args:
             return f(v)
+
         args_ = []
         for e in args:
             args_.append(self.choice(e))
@@ -343,11 +352,19 @@ class ErrorF(MaybeF):
         return not bool(x) and isinstance(x, Failure)
 
     def map(self, f, v, *args):
-        if not args:
-            return f(v)
-        args_ = []
+        v = self.choice(v)
 
+        args_ = []
         failures = []
+
+        if not args:
+            if self.is_failure(v):
+                return v
+            return f(v)
+
+        if self.is_failure(v):
+            failures.append(v)
+
         for e in args:
             e = self.choice(e)
             args_.append(e)
@@ -363,24 +380,25 @@ class StateF(Context):
         return lambda s : (s,v)
 
     ## state : s -> (s, v)
-    def apply(self, fk, *args, **kwargs):
-        def wrapped(g):
-            def _wrapped(s):
-                s1,v = fk(s)
-                gk = g(self, v)
-                return gk(s1)
-            return _wrapped
+    ## a -> ma -> ma -> mb
+    def bind(self, ma, f, *args, **kwargs):
+        def wrapped(s):
+            s1, v = ma(s)
+            fk = f(self, v, *args, **kwargs)
+            return fk(s1)
         return wrapped
 
     def lifted(self, f, v, *args, **kwargs):
         return self.unit(f(v, *args, **kwargs))
 
-    def map(self, f, x, *args):
+    def map(self, f, ma, *args):
         if not args:
             def wrapped(s):
+                s, x = ma(s)
                 return (s, f(x))
         def wrapped_multi(s):
-            arguments = [x]
+            s, v = ma(s)
+            arguments = [v]
             for mx in args:
                 s, v = mx(s)
                 arguments.append(v)
@@ -405,21 +423,19 @@ class ListF(Context):
     def unit(self, v):
         return [v]
 
-    def apply(self, xs, *args, **kwargs):
-        def wrapped(f):
-            r = []
-            for x in xs:
-                r.extend(f(self, x))
-            return r
-        return wrapped
+    def bind(self, xs, f, *args, **kwargs):
+        r = []
+        for x in xs:
+            r.extend(f(self, x))
+        return r
 
     def lifted(self, f, v, *args, **kwargs):
         return self.unit(f(v, *args, **kwargs))
 
-    def map(self, f, v, *args): #wa:
+    def map(self, f, vs, *args): #wa:
         if not args:
-            return self.unit(f(v))
-        return [f(v, *vs) for vs in itertools.product(*args)]
+            return [f(v) for v in vs]
+        return [f(*es) for es in itertools.product(vs, *args)]
 
 class WriterF(Context):
     def __init__(self, monoid_class):
@@ -428,29 +444,31 @@ class WriterF(Context):
     def unit(self, v):
         return (self.monoid.empty(), v)
 
-    def apply(self, (m0,v0)):
-        def wrapped(f, *args, **kwargs):
-            m1, v = f(self, v0, *args, **kwargs)
-            return (m0.append(m1),v)
-        return wrapped
+    def bind(self, (m0,v0), f, *args, **kwargs):
+        m1, v = f(self, v0, *args, **kwargs)
+        return (m0.append(m1),v)
         
     def lifted(self, f, v, *args, **kwargs):
         return self.unit(f(v, *args, **kwargs))
 
-    def map(self, f, v, *args, **kwargs):
-        return self.unit(f(v, *args, **kwargs))
+    def map(self, f, (m,v), *args, **kwargs):
+        return (m, f(v, *args, **kwargs))
 
     ## utility
     def tell(self, w):
         return lambda ctx, v: (ctx.monoid(value=w), v)
 
     def listen(self, ctx, (m, v)):
-        return (m, (v, m))
+        return (m, (m, v))
     
-    def passing(self, monoid_update):
-        return lambda ctx, v: ()
+    def passing(self, update):
+        def wrapped(ctx, (m, v)):
+            return (update(m, v), v)
+        return wrapped
         
+"""
 
+"""
 # ## todo: guard function
 # ## todo: interface change
 # ## todo: alternative support

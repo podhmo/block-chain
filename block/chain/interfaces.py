@@ -34,14 +34,14 @@ class IExecuteFlavor(Interface):
         
     def unit(value):
         """ return wrapped value on themself iff need"""
-
-    def apply(value):
-        """ generate continuation on themself"""
     
     def lifted(f, v, *args, **kwargs):
         """ generate lifted function application on themself"""
 
-    def map(f, v, *args):
+    def bind(ma, f, *args, **kwargs):
+        """ calulate into wrapped context"""
+
+    def map(f, ma, *args):
         """ generate mapping function on themself.
         most likely, (a -*> b) -> (m a -*> m b)
         """
